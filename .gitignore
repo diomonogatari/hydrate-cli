@@ -1,0 +1,11 @@
+# Built binary (built locally; releases are attached to tags)
+/hydrate
+/dist/
+
+# Go test/build artifacts
+*.test
+*.out
+coverage.txt
+
+# Editor / OS noise
+.DS_Store
