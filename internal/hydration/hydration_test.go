@@ -82,6 +82,38 @@ func TestAsleepIsCalm(t *testing.T) {
 	}
 }
 
+func TestDailyTotals(t *testing.T) {
+	cfg := config.Default() // reset hour 4
+	now := time.Date(2026, 6, 5, 12, 0, 0, 0, time.UTC)
+
+	events := []store.Event{
+		ev(time.Date(2026, 6, 5, 9, 0, 0, 0, time.UTC), 250),  // today
+		ev(time.Date(2026, 6, 5, 11, 0, 0, 0, time.UTC), 500), // today
+		ev(time.Date(2026, 6, 4, 20, 0, 0, 0, time.UTC), 750), // yesterday
+		ev(time.Date(2026, 6, 5, 2, 0, 0, 0, time.UTC), 100),  // 2am -> belongs to JUNE 4 logical day
+		ev(time.Date(2026, 5, 1, 0, 0, 0, 0, time.UTC), 999),  // far outside the window
+	}
+
+	totals := DailyTotals(cfg, events, now, 3)
+	if len(totals) != 3 {
+		t.Fatalf("want 3 days, got %d", len(totals))
+	}
+	// Oldest first; last is today.
+	if got := totals[2].ML; got != 750 { // today: 250 + 500
+		t.Errorf("today total = %d, want 750", got)
+	}
+	if got := totals[1].ML; got != 850 { // yesterday: 750 + the 2am-of-the-5th glass
+		t.Errorf("yesterday total = %d, want 850", got)
+	}
+	if got := totals[0].ML; got != 0 {
+		t.Errorf("two days ago total = %d, want 0", got)
+	}
+	// Day ordering is contiguous and chronological.
+	if !totals[2].Day.Equal(ResetBoundary(cfg, now)) {
+		t.Errorf("last bucket should be today's reset boundary")
+	}
+}
+
 func TestResetBoundary(t *testing.T) {
 	cfg := config.Default() // reset hour 4
 	// 01:00 belongs to the previous logical day -> boundary is yesterday 04:00.

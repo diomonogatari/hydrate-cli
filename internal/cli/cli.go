@@ -38,6 +38,8 @@ func Run(args []string) int {
 		return cmdTick(rest)
 	case "segment":
 		return cmdSegment(rest)
+	case "stats":
+		return cmdStats(rest)
 	case "config":
 		return cmdConfig(rest)
 	case "version", "--version", "-v":
@@ -116,6 +118,7 @@ Usage:
   hydrate undo            Remove the most recent drink logged today
   hydrate tick            Heartbeat: recompute, refresh the tmux segment (timer-run)
   hydrate segment         Print the styled tmux status string (debug)
+  hydrate stats [--days N] History rollup from the log (default last 7 days)
   hydrate config [--edit] Show resolved config and its path; --edit opens $EDITOR
   hydrate version         Print version
 

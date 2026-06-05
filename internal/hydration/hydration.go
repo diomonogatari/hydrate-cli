@@ -151,6 +151,47 @@ func levelFor(since, interval time.Duration, inWaking bool) Level {
 	}
 }
 
+// DayTotal is one logical day's intake.
+type DayTotal struct {
+	Day time.Time // the day's reset boundary (its logical start)
+	ML  int       // total millilitres logged that day
+}
+
+// DailyTotals buckets events into the last `days` logical days (oldest first,
+// the current day last), using the day_reset_hour boundary. Days with no drinks
+// appear with ML == 0.
+func DailyTotals(cfg config.Config, events []store.Event, now time.Time, days int) []DayTotal {
+	if days < 1 {
+		days = 1
+	}
+	today := ResetBoundary(cfg, now)
+
+	totals := make([]DayTotal, days)
+	for i := range totals {
+		// i == days-1 is today; earlier indices step back one day at a time.
+		totals[i] = DayTotal{Day: today.AddDate(0, 0, -(days - 1 - i))}
+	}
+
+	for _, e := range events {
+		if e.TS < totals[0].Day.Unix() {
+			continue
+		}
+		for i := range totals {
+			var end int64
+			if i+1 < days {
+				end = totals[i+1].Day.Unix()
+			} else {
+				end = totals[i].Day.AddDate(0, 0, 1).Unix()
+			}
+			if e.TS >= totals[i].Day.Unix() && e.TS < end {
+				totals[i].ML += e.ML
+				break
+			}
+		}
+	}
+	return totals
+}
+
 // ResetBoundary returns the most recent day_reset_hour boundary at or before
 // now. Events at or after it belong to the current logical day.
 func ResetBoundary(cfg config.Config, now time.Time) time.Time {

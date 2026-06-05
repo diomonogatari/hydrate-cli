@@ -264,6 +264,63 @@ func cmdConfig(args []string) int {
 	return 0
 }
 
+func cmdStats(args []string) int {
+	fs := flag.NewFlagSet("stats", flag.ContinueOnError)
+	days := fs.Int("days", 7, "number of days to summarize")
+	week := fs.Bool("week", false, "summarize the last 7 days (same as --days 7)")
+	asJSON := fs.Bool("json", false, "machine-readable output")
+	if err := fs.Parse(args); err != nil {
+		return 2
+	}
+	n := *days
+	if *week {
+		n = 7
+	}
+	if n < 1 {
+		n = 1
+	}
+
+	cfg, err := config.Load()
+	if err != nil {
+		return fail(fmt.Errorf("reading config: %w", err))
+	}
+	events, err := store.LoadEvents()
+	if err != nil {
+		return fail(fmt.Errorf("reading log: %w", err))
+	}
+	totals := hydration.DailyTotals(cfg, events, time.Now(), n)
+
+	if *asJSON {
+		rows := make([]map[string]any, len(totals))
+		for i, d := range totals {
+			rows[i] = map[string]any{
+				"date":    d.Day.Format("2006-01-02"),
+				"ml":      d.ML,
+				"goal_ml": cfg.DailyGoalML,
+				"percent": percentOf(d.ML, cfg.DailyGoalML),
+			}
+		}
+		return printJSON(rows)
+	}
+
+	sum, met := 0, 0
+	for _, d := range totals {
+		pct := percentOf(d.ML, cfg.DailyGoalML)
+		sum += d.ML
+		if d.ML >= cfg.DailyGoalML {
+			met++
+		}
+		fmt.Printf("%s  %s %3d%%  %s\n",
+			d.Day.Format("Mon 02 Jan"),
+			progressBar(float64(d.ML)/float64(max1(cfg.DailyGoalML)), 16),
+			pct, displayVolume(d.ML, cfg.Units))
+	}
+	avg := sum / len(totals)
+	fmt.Printf("\n%d-day average: %s · goal met %d/%d days\n",
+		len(totals), displayVolume(avg, cfg.Units), met, len(totals))
+	return 0
+}
+
 // --- shared output helpers ---
 
 func statusPayload(cfg config.Config, st hydration.State) map[string]any {
