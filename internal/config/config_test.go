@@ -14,9 +14,6 @@ func TestDefaults(t *testing.T) {
 	if d.NotifyMinLevel != "overdue" {
 		t.Errorf("notify floor default = %q, want overdue", d.NotifyMinLevel)
 	}
-	if d.NuclearEscalation {
-		t.Error("nuclear escalation should default off")
-	}
 }
 
 func TestLoadWritesDefaultOnFirstRun(t *testing.T) {
@@ -42,7 +39,8 @@ func TestLoadReadsOverrides(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(dir, "hydrate"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	body := "daily_goal_ml = 3000\nglass_ml = 500\nunits = \"oz\"\nnuclear_escalation = true\n"
+	// Includes an unknown key to confirm it's ignored, not an error.
+	body := "daily_goal_ml = 3000\nglass_ml = 500\nunits = \"oz\"\nlegacy_unknown_key = true\n"
 	if err := os.WriteFile(filepath.Join(dir, "hydrate", "config.toml"), []byte(body), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -51,7 +49,7 @@ func TestLoadReadsOverrides(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Load: %v", err)
 	}
-	if cfg.DailyGoalML != 3000 || cfg.GlassML != 500 || cfg.Units != "oz" || !cfg.NuclearEscalation {
+	if cfg.DailyGoalML != 3000 || cfg.GlassML != 500 || cfg.Units != "oz" {
 		t.Errorf("overrides not applied: %+v", cfg)
 	}
 	// Unspecified keys fall back to defaults.

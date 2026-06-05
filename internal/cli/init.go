@@ -37,9 +37,8 @@ func cmdInit(args []string) int {
 	end := strconv.Itoa(cfg.DayEndHour)
 	units := cfg.Units
 	floor := cfg.NotifyMinLevel
-	nuclear := cfg.NuclearEscalation
 	enableTimer := true
-	installHook := true
+	autoWire := true
 
 	form := huh.NewForm(
 		huh.NewGroup(
@@ -65,14 +64,12 @@ func cmdInit(args []string) int {
 					huh.NewOption("critical only — ~2.5× interval", "critical"),
 					huh.NewOption("due — earliest, 1× interval", "due"),
 				).Value(&floor),
-			huh.NewConfirm().Title("Recolor the whole tmux bar at critical?").
-				Description("Maximally catchable, more intrusive.").Value(&nuclear),
 		),
 		huh.NewGroup(
 			huh.NewConfirm().Title("Enable the background heartbeat now?").
 				Description("Installs + starts the systemd --user timer.").Value(&enableTimer),
-			huh.NewConfirm().Title("Install the zsh activity hook?").
-				Description("Lets notifications respect 'terminal in use'.").Value(&installHook),
+			huh.NewConfirm().Title("Wire your shell + tmux for you?").
+				Description("Adds the hook to your zshrc and the segment to tmux.conf (.bak backups).").Value(&autoWire),
 		),
 	)
 
@@ -91,7 +88,6 @@ func cmdInit(args []string) int {
 	cfg.DayEndHour = atoiOr(end, cfg.DayEndHour)
 	cfg.Units = units
 	cfg.NotifyMinLevel = floor
-	cfg.NuclearEscalation = nuclear
 
 	if err := config.Save(cfg); err != nil {
 		return fail(err)
@@ -101,33 +97,60 @@ func cmdInit(args []string) int {
 	hookPath := setup.HookPath()
 	if Assets == nil {
 		fmt.Fprintln(os.Stderr, "  ! embedded assets unavailable; skipping system wiring")
-	} else {
-		if enableTimer {
-			if _, err := setup.InstallUnits(Assets); err != nil {
-				fmt.Fprintln(os.Stderr, "  ! could not install units:", err)
-			} else if err := setup.EnableTimer(); err != nil {
-				fmt.Fprintln(os.Stderr, "  ! could not enable timer:", err)
-			} else {
-				fmt.Println("✓ Heartbeat enabled (systemd --user hydrate.timer)")
-			}
-		}
-		if installHook {
-			if p, err := setup.InstallHook(Assets); err != nil {
-				fmt.Fprintln(os.Stderr, "  ! could not install hook:", err)
-			} else {
-				hookPath = p
-				fmt.Println("✓ Installed zsh hook →", p)
-			}
+		printManualSteps(hookPath)
+		return 0
+	}
+
+	if enableTimer {
+		if _, err := setup.InstallUnits(Assets); err != nil {
+			fmt.Fprintln(os.Stderr, "  ! could not install units:", err)
+		} else if err := setup.EnableTimer(); err != nil {
+			fmt.Fprintln(os.Stderr, "  ! could not enable timer:", err)
+		} else {
+			fmt.Println("✓ Heartbeat enabled (systemd --user hydrate.timer)")
 		}
 	}
 
-	printNextSteps(hookPath)
+	// Always lay down the hook file so a `source` line has a target.
+	if p, err := setup.InstallHook(Assets); err != nil {
+		fmt.Fprintln(os.Stderr, "  ! could not install hook:", err)
+	} else {
+		hookPath = p
+		fmt.Println("✓ Installed zsh hook →", p)
+	}
+
+	if !autoWire {
+		printManualSteps(hookPath)
+		return 0
+	}
+
+	// Auto-wire shell + tmux (idempotent; backs up existing files first).
+	if r, err := setup.WireZsh(hookPath); err != nil {
+		fmt.Fprintln(os.Stderr, "  ! could not wire zsh:", err)
+	} else if r.Changed {
+		fmt.Println("✓ Wired zsh →", r.Path)
+	} else {
+		fmt.Println("• zsh already wired →", r.Path)
+	}
+
+	if r, err := setup.WireTmux(); err != nil {
+		fmt.Fprintln(os.Stderr, "  ! could not wire tmux:", err)
+	} else if r.Changed {
+		fmt.Println("✓ Wired tmux →", r.Path)
+		setup.ReloadTmux(r.Path)
+	} else {
+		fmt.Println("• tmux already wired →", r.Path)
+	}
+
+	fmt.Print("\nEdited files were backed up alongside as *.hydrate.bak.\n" +
+		"Open a new shell (or `source` your zshrc) to load the hook; the tmux segment\n" +
+		"is live now if a server was running.  Then:  hydrate log\n")
 	return 0
 }
 
-func printNextSteps(hookPath string) {
+func printManualSteps(hookPath string) {
 	fmt.Print(`
-Two lines to finish — hydrate won't edit your shell or tmux for you:
+Two lines to finish — add them yourself:
 
   • zsh  — add to your interactive shell config:
       source "` + hookPath + `"

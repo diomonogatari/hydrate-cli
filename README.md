@@ -101,8 +101,7 @@ set -ag status-right ' #(cat ${XDG_STATE_HOME:-$HOME/.local/state}/hydrate/segme
 
 The segment escalates with urgency — subtle blue when `ok`, through amber when
 `overdue`, to a bright, bold, blinking, pulsing block at `critical` (built to
-catch peripheral vision). Set `nuclear_escalation = true` to additionally
-recolor the whole bar at `critical`.
+catch peripheral vision).
 
 ## Shell hook (recommended)
 
@@ -129,7 +128,6 @@ On first run, `hydrate` writes a commented config to
 | `notify_min_level` | `"overdue"` | Lowest urgency that may notify (`due`/`overdue`/`critical`) |
 | `notify_cooldown_sec` | `1800` | Minimum gap between notifications (escalation overrides it) |
 | `units` | `"ml"` | `ml` or `oz`, display only |
-| `nuclear_escalation` | `false` | Recolor the whole tmux bar at `critical` (intrusive, opt-in) |
 
 ## Urgency levels
 

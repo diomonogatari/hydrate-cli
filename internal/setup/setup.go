@@ -5,6 +5,7 @@
 package setup
 
 import (
+	"bytes"
 	"fmt"
 	"io/fs"
 	"os"
@@ -80,6 +81,96 @@ func InstallHook(assets fs.FS) (string, error) {
 		return path, err
 	}
 	return path, nil
+}
+
+// --- shell / tmux wiring (idempotent, with backups) ---
+
+// WireResult reports what a wiring step did.
+type WireResult struct {
+	Path    string
+	Changed bool // false means it was already wired (skipped)
+}
+
+// ZshrcPath resolves the interactive zsh rc: $ZDOTDIR/.zshrc, else ~/.zshrc.
+func ZshrcPath() string {
+	if z := os.Getenv("ZDOTDIR"); z != "" {
+		return filepath.Join(z, ".zshrc")
+	}
+	home, _ := os.UserHomeDir()
+	return filepath.Join(home, ".zshrc")
+}
+
+// TmuxConfPath resolves the tmux config: $XDG_CONFIG_HOME/tmux/tmux.conf if it
+// exists, else ~/.tmux.conf.
+func TmuxConfPath() string {
+	p := filepath.Join(xdg("XDG_CONFIG_HOME", ".config"), "tmux", "tmux.conf")
+	if _, err := os.Stat(p); err == nil {
+		return p
+	}
+	home, _ := os.UserHomeDir()
+	return filepath.Join(home, ".tmux.conf")
+}
+
+// WireZsh appends a `source <hook>` line to the user's zshrc unless it already
+// references hydrate. Backs the file up first.
+func WireZsh(hookPath string) (WireResult, error) {
+	path := ZshrcPath()
+	data, _ := os.ReadFile(path)
+	if bytes.Contains(data, []byte("hydrate")) {
+		return WireResult{path, false}, nil
+	}
+	block := fmt.Sprintf("\n# hydrate — activity hook (added by `hydrate init`)\nsource %q\n", hookPath)
+	if err := appendWithBackup(path, data, block); err != nil {
+		return WireResult{path, false}, err
+	}
+	return WireResult{path, true}, nil
+}
+
+// WireTmux appends the status-bar segment block to tmux.conf unless it is
+// already present. The appended block is itself runtime-idempotent (an if-shell
+// guard) so re-sourcing the config won't duplicate the segment. Backs up first.
+func WireTmux() (WireResult, error) {
+	path := TmuxConfPath()
+	data, _ := os.ReadFile(path)
+	if bytes.Contains(data, []byte("hydrate/segment")) {
+		return WireResult{path, false}, nil
+	}
+	block := "\n# hydrate — water segment (added by `hydrate init`)\n" +
+		"set -g status-interval 5\n" +
+		"set -g status-right-length 100\n" +
+		"if-shell '! tmux show-options -g status-right | grep -q hydrate/segment' \\\n" +
+		"  \"set -ag status-right ' #(cat \\${XDG_STATE_HOME:-\\$HOME/.local/state}/hydrate/segment 2>/dev/null)'\"\n"
+	if err := appendWithBackup(path, data, block); err != nil {
+		return WireResult{path, false}, err
+	}
+	return WireResult{path, true}, nil
+}
+
+// ReloadTmux best-effort re-sources a config into any running server.
+func ReloadTmux(path string) {
+	if _, err := exec.LookPath("tmux"); err != nil {
+		return
+	}
+	_ = exec.Command("tmux", "source-file", path).Run()
+	_ = exec.Command("tmux", "refresh-client", "-S").Run()
+}
+
+func appendWithBackup(path string, existing []byte, block string) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return err
+	}
+	if len(existing) > 0 {
+		if err := os.WriteFile(path+".hydrate.bak", existing, 0o644); err != nil {
+			return err
+		}
+	}
+	f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	_, err = f.WriteString(block)
+	return err
 }
 
 func xdg(envVar string, fallback ...string) string {
