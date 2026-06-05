@@ -62,5 +62,14 @@ goreleaser check                       # validate .goreleaser.yaml
 goreleaser release --snapshot --clean  # full build into ./dist
 ```
 
+> ⚠️ **Never move or re-point a published tag.** The Go module proxy caches every
+> `vX.Y.Z` immutably, so moving a tag silently breaks `go install` even when
+> GitHub shows the new commit. Always bump to a fresh version instead.
+
+The binary's version is resolved automatically (`internal/cli.resolveVersion`):
+ldflags for release / `make` builds, the embedded module version for
+`go install …@vX.Y.Z`, and a `dev-<rev>` string for plain `go build` — so no
+build mode reports a stale version.
+
 CI (`.github/workflows/ci.yml`) runs gofmt, vet, build, and tests on every push
 and pull request.

@@ -7,6 +7,7 @@ import (
 	"math"
 	"os"
 	"os/exec"
+	"runtime/debug"
 	"time"
 
 	"github.com/diomonogatari/hydrate-cli/internal/config"
@@ -15,8 +16,49 @@ import (
 	"github.com/diomonogatari/hydrate-cli/internal/store"
 )
 
-// version is overridable at build time with -ldflags "-X ...cli.version=...".
-var version = "0.1.0-dev"
+// version is set at build time via -ldflags "-X ...cli.version=..." by GoReleaser
+// and `make build`. When empty (e.g. a `go install ...@vX.Y.Z` build, which gets
+// no ldflags), resolveVersion falls back to the module/VCS info the Go toolchain
+// embeds — so released binaries always self-report a real version.
+var version = ""
+
+// resolveVersion returns the best available version string for this build.
+func resolveVersion() string {
+	bi, _ := debug.ReadBuildInfo()
+	return versionFrom(version, bi)
+}
+
+// versionFrom is the pure resolution logic, separated for testing. Precedence:
+// ldflags > module version (`go install module@v…`) > VCS revision > "dev".
+func versionFrom(ldflagsVer string, bi *debug.BuildInfo) string {
+	if ldflagsVer != "" {
+		return ldflagsVer
+	}
+	if bi == nil {
+		return "dev"
+	}
+	if v := bi.Main.Version; v != "" && v != "(devel)" {
+		return v
+	}
+	var rev, dirty string
+	for _, s := range bi.Settings {
+		switch s.Key {
+		case "vcs.revision":
+			rev = s.Value
+		case "vcs.modified":
+			if s.Value == "true" {
+				dirty = "-dirty"
+			}
+		}
+	}
+	if rev != "" {
+		if len(rev) > 12 {
+			rev = rev[:12]
+		}
+		return "dev-" + rev + dirty
+	}
+	return "dev"
+}
 
 // Run is the program entry point. It returns a process exit code.
 func Run(args []string) int {
@@ -30,7 +72,7 @@ func Run(args []string) int {
 			usage(os.Stdout)
 			return 0
 		case "version", "-v", "--version":
-			fmt.Println("hydrate", version)
+			fmt.Println("hydrate", resolveVersion())
 			return 0
 		}
 	}
