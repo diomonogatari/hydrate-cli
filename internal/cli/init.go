@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/huh"
+	"github.com/charmbracelet/lipgloss"
 	"golang.org/x/term"
 
 	"github.com/diomonogatari/hydrate-cli/internal/config"
@@ -94,74 +95,144 @@ func cmdInit(args []string) int {
 	}
 	fmt.Println("\n✓ Saved config →", config.Path())
 
+	// Gather outcomes, then render one cohesive, styled summary.
+	steps := []initStep{{markOK, "config saved"}}
 	hookPath := setup.HookPath()
+	var wiredFiles, needManual bool
+
 	if Assets == nil {
-		fmt.Fprintln(os.Stderr, "  ! embedded assets unavailable; skipping system wiring")
-		printManualSteps(hookPath)
+		steps = append(steps, initStep{markWarn, "system wiring skipped (no embedded assets)"})
+		printInitSummary(steps, summaryOpts{manual: true, hookPath: hookPath})
 		return 0
 	}
 
-	if enableTimer {
+	switch {
+	case !enableTimer:
+		steps = append(steps, initStep{markSkip, "heartbeat left off"})
+	default:
 		if _, err := setup.InstallUnits(Assets); err != nil {
-			fmt.Fprintln(os.Stderr, "  ! could not install units:", err)
+			steps = append(steps, initStep{markWarn, "heartbeat: " + short(err)})
 		} else if err := setup.EnableTimer(); err != nil {
-			fmt.Fprintln(os.Stderr, "  ! could not enable timer:", err)
+			steps = append(steps, initStep{markWarn, "heartbeat: " + short(err)})
 		} else {
-			fmt.Println("✓ Heartbeat enabled (systemd --user hydrate.timer)")
+			steps = append(steps, initStep{markOK, "heartbeat running (systemd timer)"})
 		}
 	}
 
 	// Always lay down the hook file so a `source` line has a target.
 	if p, err := setup.InstallHook(Assets); err != nil {
-		fmt.Fprintln(os.Stderr, "  ! could not install hook:", err)
+		steps = append(steps, initStep{markWarn, "zsh hook: " + short(err)})
 	} else {
 		hookPath = p
-		fmt.Println("✓ Installed zsh hook →", p)
+		steps = append(steps, initStep{markOK, "zsh hook installed"})
 	}
 
-	if !autoWire {
-		printManualSteps(hookPath)
-		return 0
-	}
+	if autoWire {
+		if r, err := setup.WireZsh(hookPath); err != nil {
+			steps, needManual = append(steps, initStep{markWarn, "zsh: " + short(err)}), true
+		} else if r.Changed {
+			steps, wiredFiles = append(steps, initStep{markOK, "zsh wired"}), true
+		} else {
+			steps = append(steps, initStep{markSkip, "zsh already wired"})
+		}
 
-	// Auto-wire shell + tmux (idempotent; backs up existing files first).
-	if r, err := setup.WireZsh(hookPath); err != nil {
-		fmt.Fprintln(os.Stderr, "  ! could not wire zsh:", err)
-	} else if r.Changed {
-		fmt.Println("✓ Wired zsh →", r.Path)
+		if r, err := setup.WireTmux(); err != nil {
+			steps, needManual = append(steps, initStep{markWarn, "tmux: " + short(err)}), true
+		} else if r.Changed {
+			steps, wiredFiles = append(steps, initStep{markOK, "tmux wired"}), true
+			setup.ReloadTmux(r.Path)
+		} else {
+			steps = append(steps, initStep{markSkip, "tmux already wired"})
+		}
 	} else {
-		fmt.Println("• zsh already wired →", r.Path)
+		needManual = true
 	}
 
-	if r, err := setup.WireTmux(); err != nil {
-		fmt.Fprintln(os.Stderr, "  ! could not wire tmux:", err)
-	} else if r.Changed {
-		fmt.Println("✓ Wired tmux →", r.Path)
-		setup.ReloadTmux(r.Path)
-	} else {
-		fmt.Println("• tmux already wired →", r.Path)
-	}
-
-	fmt.Print("\nEdited files were backed up alongside as *.hydrate.bak.\n" +
-		"Open a new shell (or `source` your zshrc) to load the hook; the tmux segment\n" +
-		"is live now if a server was running.  Then:  hydrate log\n")
+	printInitSummary(steps, summaryOpts{manual: needManual, wired: wiredFiles, hookPath: hookPath})
 	return 0
 }
 
-func printManualSteps(hookPath string) {
-	fmt.Print(`
-Two lines to finish — add them yourself:
+type initStep struct{ mark, text string }
 
-  • zsh  — add to your interactive shell config:
-      source "` + hookPath + `"
+const (
+	markOK   = "ok"
+	markSkip = "skip"
+	markWarn = "warn"
+)
 
-  • tmux — add to tmux.conf, after any theme/tpm line:
-      set -g status-interval 5
-      set -g status-right-length 100   # default 40 truncates the segment
-      set -ag status-right ' #(cat ${XDG_STATE_HOME:-$HOME/.local/state}/hydrate/segment 2>/dev/null)'
+type summaryOpts struct {
+	manual   bool
+	wired    bool
+	hookPath string
+}
 
-Then run:  hydrate log     (the bar updates within a few seconds)
-`)
+var (
+	stTitle  = lipgloss.NewStyle().Foreground(lipgloss.Color("6")).Bold(true)
+	stHead   = lipgloss.NewStyle().Bold(true)
+	stOK     = lipgloss.NewStyle().Foreground(lipgloss.Color("2")).Bold(true)
+	stSkip   = lipgloss.NewStyle().Foreground(lipgloss.Color("8"))
+	stWarn   = lipgloss.NewStyle().Foreground(lipgloss.Color("3")).Bold(true)
+	stDim    = lipgloss.NewStyle().Foreground(lipgloss.Color("8"))
+	stCmd    = lipgloss.NewStyle().Foreground(lipgloss.Color("4")).Bold(true)
+	stCmdCol = lipgloss.NewStyle().Foreground(lipgloss.Color("4")).Bold(true).Width(16)
+)
+
+func printInitSummary(steps []initStep, o summaryOpts) {
+	fmt.Print(renderInitSummary(steps, o))
+}
+
+func renderInitSummary(steps []initStep, o summaryOpts) string {
+	var b strings.Builder
+	line := func(s string) { b.WriteString(s + "\n") }
+
+	b.WriteByte('\n')
+	line(stTitle.Render("💧 hydrate is ready"))
+	b.WriteByte('\n')
+	for _, s := range steps {
+		mark := stSkip.Render("•")
+		switch s.mark {
+		case markOK:
+			mark = stOK.Render("✓")
+		case markWarn:
+			mark = stWarn.Render("!")
+		}
+		line("  " + mark + " " + s.text)
+	}
+
+	b.WriteByte('\n')
+	line(stHead.Render("Try it"))
+	line("  " + stCmdCol.Render("hydrate log") + stDim.Render("log a glass"))
+	line("  " + stCmdCol.Render("hydrate") + stDim.Render("today's progress"))
+	line("  " + stCmdCol.Render("hydrate --help") + stDim.Render("all commands"))
+
+	if o.manual {
+		b.WriteByte('\n')
+		line(stHead.Render("Finish wiring") + stDim.Render("  (add these yourself)"))
+		line("  " + stDim.Render(`zsh   source "`+o.hookPath+`"`))
+		line("  " + stDim.Render(`tmux  set -g status-interval 5`))
+		line("  " + stDim.Render(`      set -g status-right-length 100`))
+		line("  " + stDim.Render(`      set -ag status-right ' #(cat ${XDG_STATE_HOME:-$HOME/.local/state}/hydrate/segment 2>/dev/null)'`))
+	}
+
+	b.WriteByte('\n')
+	foot := stDim.Render("New shell loads the ") + stCmd.Render("w") + stDim.Render("/") +
+		stCmd.Render("ww") + stDim.Render(" shortcuts.")
+	if o.wired {
+		foot += stDim.Render("  ·  backups: *.hydrate.bak")
+	}
+	line(foot)
+	return b.String()
+}
+
+func short(err error) string {
+	s := err.Error()
+	if i := strings.IndexByte(s, '\n'); i >= 0 {
+		s = s[:i]
+	}
+	if len(s) > 60 {
+		s = s[:57] + "…"
+	}
+	return s
 }
 
 func interactive() bool {
