@@ -11,6 +11,10 @@ track, impossible to miss when you're behind — and reaches you with a single
 desktop notification *only* when you've stepped away. No popups mid-flow, no
 streaks to maintain, no app to open. Just a glass of water when you need one.
 
+![hydrate: setup, then a tmux status segment that escalates from calm blue through amber to a bright "DRINK WATER" — calmed the moment you log a glass](demo/hydrate.gif)
+
+The segment escalates with urgency, and a glass calms it instantly:
+
 ```text
 ok          💧 5/8                  calm blue · easy to ignore
 due         💧 5/8                  a gentle amber nudge
