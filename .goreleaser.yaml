@@ -44,4 +44,5 @@ changelog:
       - "^chore:"
 
 release:
-  draft: false
+  # Create a draft release to review before publishing.
+  draft: true

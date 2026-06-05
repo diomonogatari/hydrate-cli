@@ -49,8 +49,8 @@ Releases are automated with [GoReleaser](https://goreleaser.com), triggered by
 pushing a `vX.Y.Z` tag:
 
 ```bash
-git tag -a v0.1.0 -m "v0.1.0"
-git push origin v0.1.0
+git tag -a v1.0.0 -m "v1.0.0"
+git push origin v1.0.0
 ```
 
 The `release` workflow builds Linux amd64/arm64 archives, generates checksums and
