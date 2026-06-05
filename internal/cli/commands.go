@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/diomonogatari/hydrate-cli/internal/config"
+	"github.com/diomonogatari/hydrate-cli/internal/format"
 	"github.com/diomonogatari/hydrate-cli/internal/hydration"
 	"github.com/diomonogatari/hydrate-cli/internal/render"
 	"github.com/diomonogatari/hydrate-cli/internal/store"
@@ -39,10 +40,10 @@ func cmdStatus(args []string) int {
 
 	next := "now"
 	if st.NextDue > 0 {
-		next = "in " + humanizeDuration(st.NextDue)
+		next = "in " + format.HumanizeDuration(st.NextDue)
 	}
 	fmt.Printf("last drink %s · next due %s · status: %s\n",
-		humanizeDuration(st.SinceLast), next, st.Level)
+		format.HumanizeDuration(st.SinceLast), next, st.Level)
 	if !st.InWakingWindow {
 		fmt.Println("(outside your waking window — resting)")
 	}

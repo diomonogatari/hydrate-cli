@@ -104,19 +104,6 @@ Global:
 
 // --- small formatting helpers ---
 
-// humanizeDuration renders a duration as "1h 40m" / "5m" / "just now".
-func humanizeDuration(d time.Duration) string {
-	if d < time.Minute {
-		return "just now"
-	}
-	h := int(d.Hours())
-	m := int(d.Minutes()) % 60
-	if h > 0 {
-		return fmt.Sprintf("%dh %dm", h, m)
-	}
-	return fmt.Sprintf("%dm", m)
-}
-
 // progressBar renders a fixed-width [###---] bar for frac in [0,1].
 func progressBar(frac float64, width int) string {
 	if frac < 0 {
