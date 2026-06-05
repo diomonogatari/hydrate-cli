@@ -133,6 +133,7 @@ Nothing secret is ever stored — only timestamps and millilitres.
 
 | Package | Responsibility |
 | --- | --- |
+| `cmd/hydrate` | The `main` entry point (so `go install …/cmd/hydrate` yields a `hydrate` binary) |
 | `internal/paths` | XDG path resolution |
 | `internal/config` | Load/save the commented TOML config |
 | `internal/store` | Append-only JSONL log, segment cache, atomic writes |
@@ -140,6 +141,7 @@ Nothing secret is ever stored — only timestamps and millilitres.
 | `internal/render` | tmux segment styling |
 | `internal/notify` | Notification policy (pure) + D-Bus delivery |
 | `internal/focus` | Best-effort window-focus probe |
+| `internal/assets` | Embedded install files (systemd units, zsh hook) via `go:embed` |
 | `internal/setup` | `hydrate init` system wiring (systemd, hook, shell/tmux) |
 | `internal/cli` | Command dispatch and the interactive wizard |
 

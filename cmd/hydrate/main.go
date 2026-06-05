@@ -8,6 +8,5 @@ import (
 )
 
 func main() {
-	cli.Assets = assets
 	os.Exit(cli.Run(os.Args))
 }

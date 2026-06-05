@@ -13,9 +13,9 @@ func TestInstallUnitsAndHook(t *testing.T) {
 	t.Setenv("XDG_DATA_HOME", t.TempDir())
 
 	assets := fstest.MapFS{
-		"packaging/systemd/hydrate.service": {Data: []byte("SERVICE")},
-		"packaging/systemd/hydrate.timer":   {Data: []byte("TIMER")},
-		"packaging/zsh/hydrate.zsh":         {Data: []byte("HOOK")},
+		"systemd/hydrate.service": {Data: []byte("SERVICE")},
+		"systemd/hydrate.timer":   {Data: []byte("TIMER")},
+		"zsh/hydrate.zsh":         {Data: []byte("HOOK")},
 	}
 
 	dir, err := InstallUnits(assets)

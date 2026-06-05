@@ -11,6 +11,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"golang.org/x/term"
 
+	"github.com/diomonogatari/hydrate-cli/internal/assets"
 	"github.com/diomonogatari/hydrate-cli/internal/config"
 	"github.com/diomonogatari/hydrate-cli/internal/setup"
 )
@@ -100,17 +101,11 @@ func cmdInit(args []string) int {
 	hookPath := setup.HookPath()
 	var wiredFiles, needManual bool
 
-	if Assets == nil {
-		steps = append(steps, initStep{markWarn, "system wiring skipped (no embedded assets)"})
-		printInitSummary(steps, summaryOpts{manual: true, hookPath: hookPath})
-		return 0
-	}
-
 	switch {
 	case !enableTimer:
 		steps = append(steps, initStep{markSkip, "heartbeat left off"})
 	default:
-		if _, err := setup.InstallUnits(Assets); err != nil {
+		if _, err := setup.InstallUnits(assets.FS); err != nil {
 			steps = append(steps, initStep{markWarn, "heartbeat: " + short(err)})
 		} else if err := setup.EnableTimer(); err != nil {
 			steps = append(steps, initStep{markWarn, "heartbeat: " + short(err)})
@@ -120,7 +115,7 @@ func cmdInit(args []string) int {
 	}
 
 	// Always lay down the hook file so a `source` line has a target.
-	if p, err := setup.InstallHook(Assets); err != nil {
+	if p, err := setup.InstallHook(assets.FS); err != nil {
 		steps = append(steps, initStep{markWarn, "zsh hook: " + short(err)})
 	} else {
 		hookPath = p

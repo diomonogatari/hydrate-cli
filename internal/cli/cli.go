@@ -4,7 +4,6 @@ package cli
 
 import (
 	"fmt"
-	"io/fs"
 	"math"
 	"os"
 	"os/exec"
@@ -18,10 +17,6 @@ import (
 
 // version is overridable at build time with -ldflags "-X ...cli.version=...".
 var version = "0.1.0-dev"
-
-// Assets holds the embedded install-time files (set from package main). It backs
-// `hydrate init`'s systemd/zsh wiring; nil in tests that don't need it.
-var Assets fs.FS
 
 // Run is the program entry point. It returns a process exit code.
 func Run(args []string) int {

@@ -13,11 +13,11 @@ import (
 	"path/filepath"
 )
 
-// Embedded asset paths (relative to the embedded FS root).
+// Embedded asset paths (relative to the embedded FS root; see internal/assets).
 const (
-	serviceAsset = "packaging/systemd/hydrate.service"
-	timerAsset   = "packaging/systemd/hydrate.timer"
-	hookAsset    = "packaging/zsh/hydrate.zsh"
+	serviceAsset = "systemd/hydrate.service"
+	timerAsset   = "systemd/hydrate.timer"
+	hookAsset    = "zsh/hydrate.zsh"
 )
 
 // SystemdUserDir is where the user's systemd units live.

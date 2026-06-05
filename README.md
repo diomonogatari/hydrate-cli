@@ -20,18 +20,24 @@ critical    💧 DRINK WATER 5/8      bright · bold · blinking · pulsing
 
 ## Quick start
 
+Install the binary, then run the guided setup:
+
 ```bash
-git clone https://github.com/diomonogatari/hydrate-cli
-cd hydrate-cli && ./install.sh
+go install github.com/diomonogatari/hydrate-cli/cmd/hydrate@latest
+hydrate init
 ```
 
-That builds the binary and drops you into an interactive setup that tailors your
-goal, wires up your shell and tmux, and starts the background heartbeat. Then:
+`hydrate init` tailors your goal, wires up your shell and tmux, and starts the
+background heartbeat — no repo to clone. Then:
 
 ```bash
 hydrate log      # or just `w`  → log a glass; the bar relaxes instantly
 hydrate          # or `ww`      → today at a glance
 ```
+
+No Go toolchain? Grab a prebuilt binary from [Releases](../../releases) and run
+`hydrate init`, or clone the repo and run `./install.sh` (build + install + setup
+in one).
 
 ## Why you might like it
 
@@ -73,8 +79,8 @@ hand. See [Architecture](docs/ARCHITECTURE.md#configuration) for every knob.
 
 - **Linux**, with tmux for the status segment and — for notifications — any
   freedesktop-compatible desktop (COSMIC, GNOME, KDE, dunst, mako, …).
-- **Go 1.24+** to build from source, or grab a prebuilt binary from
-  [Releases](../../releases).
+- **Go 1.24+** for `go install` / building from source — or just grab a prebuilt
+  binary from [Releases](../../releases).
 - A `systemd --user` session for the background heartbeat (optional — the bar
   still updates whenever you log).
 

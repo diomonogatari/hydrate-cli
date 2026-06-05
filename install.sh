@@ -38,7 +38,7 @@ warn() { printf '\033[1;33mwarn:\033[0m %s\n' "$*"; }
 if [ "$DO_BUILD" -eq 1 ]; then
   command -v go >/dev/null 2>&1 || { echo "go is required (or pass --no-build)"; exit 1; }
   info "Building hydrate"
-  go build -o hydrate .
+  go build -o hydrate ./cmd/hydrate
 fi
 [ -x ./hydrate ] || { echo "no ./hydrate binary; build first or drop --no-build"; exit 1; }
 

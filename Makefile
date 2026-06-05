@@ -6,7 +6,7 @@ LDFLAGS := -s -w -X github.com/diomonogatari/hydrate-cli/internal/cli.version=$(
 .PHONY: build test vet fmt lint install clean run tidy
 
 build: ## Build the binary with version stamped in
-	go build -ldflags "$(LDFLAGS)" -o $(BINARY) .
+	go build -ldflags "$(LDFLAGS)" -o $(BINARY) ./cmd/hydrate
 
 test: ## Run all tests
 	go test ./...
