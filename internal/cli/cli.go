@@ -34,6 +34,8 @@ func Run(args []string) int {
 		return cmdLog(rest)
 	case "undo":
 		return cmdUndo(rest)
+	case "tick":
+		return cmdTick(rest)
 	case "segment":
 		return cmdSegment(rest)
 	case "config":
@@ -90,6 +92,7 @@ Usage:
   hydrate [status]        Show today's intake, time since last drink, next due
   hydrate log [AMOUNT]    Log a drink (default one glass; e.g. 500, 500ml, 16oz, 1l)
   hydrate undo            Remove the most recent drink logged today
+  hydrate tick            Heartbeat: recompute, refresh the tmux segment (timer-run)
   hydrate segment         Print the styled tmux status string (debug)
   hydrate config [--edit] Show resolved config and its path; --edit opens $EDITOR
   hydrate version         Print version

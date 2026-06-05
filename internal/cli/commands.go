@@ -132,6 +132,29 @@ func cmdSegment(args []string) int {
 	return 0
 }
 
+// cmdTick is the heartbeat run by the systemd --user timer (and safe to run by
+// hand). It recomputes state, refreshes the cached tmux segment, and nudges any
+// running tmux. It is silent on success so journal logs stay quiet; later phases
+// hang the notification decision off this same path.
+func cmdTick(args []string) int {
+	fs := flag.NewFlagSet("tick", flag.ContinueOnError)
+	asJSON := fs.Bool("json", false, "machine-readable output")
+	if err := fs.Parse(args); err != nil {
+		return 2
+	}
+
+	cfg, st, err := loadState()
+	if err != nil {
+		return fail(err)
+	}
+	refreshSegment(st)
+
+	if *asJSON {
+		return printJSON(statusPayload(cfg, st))
+	}
+	return 0
+}
+
 func cmdConfig(args []string) int {
 	fs := flag.NewFlagSet("config", flag.ContinueOnError)
 	edit := fs.Bool("edit", false, "open the config file in $EDITOR")

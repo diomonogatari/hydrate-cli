@@ -1,0 +1,12 @@
+[Unit]
+Description=hydrate heartbeat (recompute hydration state, refresh tmux segment, maybe notify)
+Documentation=https://github.com/diomonogatari/hydrate-cli
+After=graphical-session.target
+PartOf=graphical-session.target
+
+[Service]
+Type=oneshot
+# Import the session env so `hydrate tick` can reach the user's D-Bus session
+# bus for desktop notifications (Phase 3). Harmless if already imported.
+ExecStartPre=-/usr/bin/systemctl --user import-environment DISPLAY WAYLAND_DISPLAY DBUS_SESSION_BUS_ADDRESS XDG_RUNTIME_DIR
+ExecStart=%h/.local/bin/hydrate tick
