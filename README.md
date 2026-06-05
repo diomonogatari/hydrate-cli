@@ -47,23 +47,29 @@ Requires Go 1.24+.
 ```bash
 git clone https://github.com/diomonogatari/hydrate-cli
 cd hydrate-cli
-./install.sh         # builds, installs the binary + zsh hook + systemd timer
+./install.sh         # builds, installs, then launches `hydrate init`
 ```
 
-`install.sh` is best-effort and idempotent. It never edits your shell rc or
-tmux.conf — it prints the two lines to add yourself. Flags: `--prefix DIR`,
-`--no-timer`, `--no-build`.
-
-Just the binary, no system wiring:
+`install.sh` builds the binary, installs it to `~/.local/bin`, and hands off to
+the interactive setup. Prefer to drive it yourself?
 
 ```bash
-go install github.com/diomonogatari/hydrate-cli@latest   # to $GOBIN
-# or: make install      (installs to ~/.local/bin)
+go install github.com/diomonogatari/hydrate-cli@latest   # binary to $GOBIN
+hydrate init                                             # interactive setup
 ```
+
+### `hydrate init`
+
+A short, `gh`-style wizard that tailors your profile (goal, glass, waking
+window, units, notification floor) and then offers to **enable the background
+heartbeat** (systemd `--user` timer) and **install the zsh hook** — all from the
+binary's embedded assets. It stops short of editing your shell rc or tmux.conf,
+printing those two lines for you to paste. Re-run it any time to reconfigure.
 
 ## Usage
 
 ```bash
+hydrate init         # interactive setup (profile + heartbeat + wiring)
 hydrate              # today's intake, time since last drink, next due
 hydrate log          # log one glass (the configured default size)
 hydrate log 500      # log 500 ml

@@ -5,6 +5,7 @@ package config
 
 import (
 	"errors"
+	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -44,22 +45,26 @@ func Default() Config {
 	}
 }
 
-// defaultTemplate is written verbatim on first run so the user gets a
-// self-documenting, comment-rich file rather than a bare key dump.
-const defaultTemplate = `# hydrate configuration — https://github.com/diomonogatari/hydrate-cli
-# Edit freely; values are read on every command.
+// render produces a self-documenting, comment-rich config file from c. It is the
+// single template used for both the first-run default and `Save`.
+func render(c Config) string {
+	return fmt.Sprintf(`# hydrate configuration — https://github.com/diomonogatari/hydrate-cli
+# Edit freely; values are read on every command. Re-run `+"`hydrate init`"+` for the wizard.
 
-daily_goal_ml       = 2000      # target volume per day
-glass_ml            = 250       # default amount logged by ` + "`hydrate log`" + `
-day_start_hour      = 7         # waking window start (local, 0-23)
-day_end_hour        = 23        # waking window end (local, 0-23)
-day_reset_hour      = 4         # the "day" rolls over here (a 1am glass counts to the prior day)
-idle_threshold_sec  = 600       # terminal considered "not in use" after this much shell inactivity
-notify_min_level    = "overdue" # minimum urgency that may notify: ok | due | overdue | critical
-notify_cooldown_sec = 1800      # minimum gap between desktop notifications (also fires on escalation)
-units               = "ml"      # "ml" or "oz" — display only
-nuclear_escalation  = false     # at "critical", recolor the ENTIRE tmux status bar (opt-in, intrusive)
-`
+daily_goal_ml       = %-7d # target volume per day
+glass_ml            = %-7d # default amount logged by `+"`hydrate log`"+`
+day_start_hour      = %-7d # waking window start (local, 0-23)
+day_end_hour        = %-7d # waking window end (local, 0-23)
+day_reset_hour      = %-7d # the "day" rolls over here (a 1am glass counts to the prior day)
+idle_threshold_sec  = %-7d # terminal considered "not in use" after this much shell inactivity
+notify_min_level    = %-9q # minimum urgency that may notify: ok | due | overdue | critical
+notify_cooldown_sec = %-7d # minimum gap between desktop notifications (also fires on escalation)
+units               = %-9q # "ml" or "oz" — display only
+nuclear_escalation  = %-7t # at "critical", recolor the ENTIRE tmux status bar (opt-in, intrusive)
+`,
+		c.DailyGoalML, c.GlassML, c.DayStartHour, c.DayEndHour, c.DayResetHour,
+		c.IdleThresholdSec, c.NotifyMinLevel, c.NotifyCooldownSec, c.Units, c.NuclearEscalation)
+}
 
 // Load reads the config file, falling back to (and writing) defaults when it
 // does not exist yet. A malformed file surfaces an error rather than silently
@@ -99,9 +104,17 @@ func EnsureExists() (string, error) {
 	return path, nil
 }
 
-func writeDefault(path string) error {
+// Save writes cfg to the config file as a commented TOML document, creating the
+// directory if needed. Used by `hydrate init`.
+func Save(cfg Config) error {
+	return write(paths.ConfigFile(), cfg)
+}
+
+func writeDefault(path string) error { return write(path, Default()) }
+
+func write(path string, cfg Config) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return err
 	}
-	return os.WriteFile(path, []byte(defaultTemplate), 0o644)
+	return os.WriteFile(path, []byte(render(cfg)), 0o644)
 }

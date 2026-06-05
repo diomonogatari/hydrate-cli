@@ -4,6 +4,7 @@ package cli
 
 import (
 	"fmt"
+	"io/fs"
 	"math"
 	"os"
 	"os/exec"
@@ -17,6 +18,10 @@ import (
 
 // version is overridable at build time with -ldflags "-X ...cli.version=...".
 var version = "0.1.0-dev"
+
+// Assets holds the embedded install-time files (set from package main). It backs
+// `hydrate init`'s systemd/zsh wiring; nil in tests that don't need it.
+var Assets fs.FS
 
 // Run is the program entry point. It returns a process exit code.
 func Run(args []string) int {
@@ -42,6 +47,8 @@ func Run(args []string) int {
 	}
 
 	switch cmd {
+	case "init":
+		return cmdInit(rest)
 	case "status":
 		return cmdStatus(rest)
 	case "log":
@@ -121,6 +128,7 @@ func usage(w *os.File) {
 	fmt.Fprint(w, `hydrate — a quiet hydration nudge
 
 Usage:
+  hydrate init            Interactive setup: profile, heartbeat, shell/tmux wiring
   hydrate [status]        Show today's intake, time since last drink, next due
   hydrate log [AMOUNT]    Log a drink (default one glass; e.g. 500, 500ml, 16oz, 1l)
   hydrate undo            Remove the most recent drink logged today
