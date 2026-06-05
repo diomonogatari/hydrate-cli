@@ -95,6 +95,7 @@ theme/tpm line (so a theme can't overwrite `status-right`):
 
 ```tmux
 set -g status-interval 5
+set -g status-right-length 100   # default is 40, which truncates the segment
 set -ag status-right ' #(cat ${XDG_STATE_HOME:-$HOME/.local/state}/hydrate/segment 2>/dev/null)'
 ```
 

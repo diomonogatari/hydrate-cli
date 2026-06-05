@@ -134,6 +134,7 @@ Two lines to finish — hydrate won't edit your shell or tmux for you:
 
   • tmux — add to tmux.conf, after any theme/tpm line:
       set -g status-interval 5
+      set -g status-right-length 100   # default 40 truncates the segment
       set -ag status-right ' #(cat ${XDG_STATE_HOME:-$HOME/.local/state}/hydrate/segment 2>/dev/null)'
 
 Then run:  hydrate log     (the bar updates within a few seconds)
