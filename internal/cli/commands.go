@@ -10,8 +10,10 @@ import (
 	"time"
 
 	"github.com/diomonogatari/hydrate-cli/internal/config"
+	"github.com/diomonogatari/hydrate-cli/internal/focus"
 	"github.com/diomonogatari/hydrate-cli/internal/format"
 	"github.com/diomonogatari/hydrate-cli/internal/hydration"
+	"github.com/diomonogatari/hydrate-cli/internal/notify"
 	"github.com/diomonogatari/hydrate-cli/internal/render"
 	"github.com/diomonogatari/hydrate-cli/internal/store"
 )
@@ -75,6 +77,7 @@ func cmdLog(args []string) int {
 	events, _ := store.LoadEvents()
 	st := hydration.Compute(cfg, events, time.Now())
 	refreshSegment(st)
+	calmNotifyLevel(st)
 
 	if *asJSON {
 		return printJSON(statusPayload(cfg, st))
@@ -106,6 +109,7 @@ func cmdUndo(args []string) int {
 	events, _ := store.LoadEvents()
 	st := hydration.Compute(cfg, events, time.Now())
 	refreshSegment(st)
+	calmNotifyLevel(st)
 
 	if *asJSON {
 		return printJSON(map[string]any{
@@ -149,11 +153,72 @@ func cmdTick(args []string) int {
 		return fail(err)
 	}
 	refreshSegment(st)
+	decision, sent := maybeNotify(cfg, st)
 
 	if *asJSON {
-		return printJSON(statusPayload(cfg, st))
+		payload := statusPayload(cfg, st)
+		payload["notify_sent"] = sent
+		payload["notify_reason"] = decision.Reason
+		return printJSON(payload)
 	}
 	return 0
+}
+
+// maybeNotify gathers the live inputs, asks the policy whether to notify, and
+// (if so) delivers and records it. Failures are reported but never abort the
+// heartbeat. It returns the decision and whether a notification was sent.
+func maybeNotify(cfg config.Config, st hydration.State) (notify.Decision, bool) {
+	minLevel, ok := hydration.ParseLevel(cfg.NotifyMinLevel)
+	if !ok {
+		minLevel = hydration.LevelOverdue
+	}
+	prev := store.LoadNotifyState()
+	prevLevel, _ := hydration.ParseLevel(prev.LastNotifiedLevel)
+	lastAct, haveAct := store.ReadActivity()
+
+	decision := notify.Decide(notify.Inputs{
+		Level:            st.Level,
+		MinLevel:         minLevel,
+		Now:              st.Now.Unix(),
+		LastActivity:     lastAct,
+		HaveActivity:     haveAct,
+		IdleThresholdSec: cfg.IdleThresholdSec,
+		Focused:          focus.Probe(),
+		PrevLevel:        prevLevel,
+		PrevNotifyTS:     prev.LastNotifyTS,
+		CooldownSec:      cfg.NotifyCooldownSec,
+	})
+	if !decision.Send {
+		return decision, false
+	}
+
+	summary, body := notify.Compose(st)
+	id, err := notify.Send(notify.Message{
+		Summary:    summary,
+		Body:       body,
+		ReplacesID: prev.LastNotifyID,
+		Critical:   st.Level == hydration.LevelCritical,
+	})
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "hydrate: notify failed:", err)
+		return decision, false
+	}
+	_ = store.SaveNotifyState(store.NotifyState{
+		LastNotifyTS:      st.Now.Unix(),
+		LastNotifiedLevel: st.Level.String(),
+		LastNotifyID:      id,
+	})
+	return decision, true
+}
+
+// calmNotifyLevel re-arms escalation after the user acts: it records the (now
+// lower) level as the last-notified one, so a fresh climb past the floor counts
+// as an escalation rather than waiting out a full cooldown. The timestamp and id
+// are preserved so cooldown still applies to repeat nudges at the same level.
+func calmNotifyLevel(st hydration.State) {
+	ns := store.LoadNotifyState()
+	ns.LastNotifiedLevel = st.Level.String()
+	_ = store.SaveNotifyState(ns)
 }
 
 func cmdConfig(args []string) int {

@@ -139,6 +139,38 @@ func ReadActivity() (int64, bool) {
 	return ts, true
 }
 
+// NotifyState records the last desktop notification so the heartbeat can apply
+// cooldown/escalation and replace (rather than stack) notifications across runs.
+type NotifyState struct {
+	LastNotifyTS      int64  `json:"last_notify_ts"`
+	LastNotifiedLevel string `json:"last_notified_level"`
+	LastNotifyID      uint32 `json:"last_notify_id"`
+}
+
+// LoadNotifyState returns the persisted notify state, or the zero value (meaning
+// "never notified") when none exists or it is unreadable.
+func LoadNotifyState() NotifyState {
+	var ns NotifyState
+	data, err := os.ReadFile(paths.NotifyStateFile())
+	if err != nil {
+		return ns
+	}
+	_ = json.Unmarshal(data, &ns)
+	return ns
+}
+
+// SaveNotifyState persists the notify state atomically.
+func SaveNotifyState(ns NotifyState) error {
+	data, err := json.Marshal(ns)
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(paths.StateDir(), 0o755); err != nil {
+		return err
+	}
+	return atomicWrite(paths.NotifyStateFile(), data, 0o644)
+}
+
 // atomicWrite writes via a temp file in the same directory followed by rename,
 // so readers never observe a half-written file.
 func atomicWrite(path string, data []byte, perm os.FileMode) error {
