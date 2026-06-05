@@ -22,6 +22,20 @@ var version = "0.1.0-dev"
 func Run(args []string) int {
 	rest := args[1:]
 
+	// Handle help/version first, even in their flag forms (-h/--help/-v/--version),
+	// so they aren't swallowed by the default "status" subcommand's flag parser.
+	if len(rest) > 0 {
+		switch rest[0] {
+		case "help", "-h", "--help":
+			usage(os.Stdout)
+			return 0
+		case "version", "-v", "--version":
+			fmt.Println("hydrate", version)
+			return 0
+		}
+	}
+
+	// Default to `status`; a leading flag (e.g. `hydrate --json`) keeps that default.
 	cmd := "status"
 	if len(rest) > 0 && !isFlag(rest[0]) {
 		cmd, rest = rest[0], rest[1:]
@@ -42,12 +56,6 @@ func Run(args []string) int {
 		return cmdStats(rest)
 	case "config":
 		return cmdConfig(rest)
-	case "version", "--version", "-v":
-		fmt.Println("hydrate", version)
-		return 0
-	case "help", "--help", "-h":
-		usage(os.Stdout)
-		return 0
 	default:
 		fmt.Fprintf(os.Stderr, "hydrate: unknown command %q\n\n", cmd)
 		usage(os.Stderr)
