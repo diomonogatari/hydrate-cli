@@ -68,11 +68,20 @@ func loadState() (config.Config, hydration.State, error) {
 	return cfg, hydration.Compute(cfg, events, time.Now()), nil
 }
 
+// pulsePeriodSec is the alternation period of the critical "pulse". It matches
+// the heartbeat cadence so the segment flips form once per tick.
+const pulsePeriodSec = 60
+
 // refreshSegment re-renders the cached tmux string and nudges any running tmux
-// so the bar reacts immediately rather than waiting for the next heartbeat.
-func refreshSegment(st hydration.State) {
-	seg := render.Segment(st.Level, st.GlassesDone, st.GlassesGoal)
+// so the bar reacts immediately rather than waiting for the next heartbeat. When
+// nuclear escalation is enabled it also recolors (or restores) the whole bar.
+func refreshSegment(cfg config.Config, st hydration.State) {
+	pulse := (st.Now.Unix()/pulsePeriodSec)%2 == 1
+	seg := render.Segment(st.Level, st.GlassesDone, st.GlassesGoal, pulse)
 	_ = store.WriteSegment(seg)
+	if cfg.NuclearEscalation {
+		applyNuclear(st.Level == hydration.LevelCritical)
+	}
 	refreshTmux()
 }
 
@@ -83,6 +92,19 @@ func refreshTmux() {
 		return
 	}
 	_ = exec.Command("tmux", "refresh-client", "-S").Run()
+}
+
+// applyNuclear recolors the entire tmux status bar at critical, and restores the
+// default (unsets the override) otherwise. Best-effort; no-op without tmux.
+func applyNuclear(on bool) {
+	if _, err := exec.LookPath("tmux"); err != nil {
+		return
+	}
+	if on {
+		_ = exec.Command("tmux", "set", "-g", "status-style", "bg=colour52").Run()
+	} else {
+		_ = exec.Command("tmux", "set", "-gu", "status-style").Run()
+	}
 }
 
 func usage(w *os.File) {

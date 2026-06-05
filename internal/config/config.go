@@ -24,6 +24,7 @@ type Config struct {
 	NotifyMinLevel    string `toml:"notify_min_level"`    // minimum urgency that may trigger a notification
 	NotifyCooldownSec int    `toml:"notify_cooldown_sec"` // min gap between notifications
 	Units             string `toml:"units"`               // "ml" or "oz" for display only
+	NuclearEscalation bool   `toml:"nuclear_escalation"`  // recolor the whole tmux bar at critical
 }
 
 // Default returns the shipped configuration. These values must stay in sync
@@ -39,6 +40,7 @@ func Default() Config {
 		NotifyMinLevel:    "overdue",
 		NotifyCooldownSec: 1800,
 		Units:             "ml",
+		NuclearEscalation: false,
 	}
 }
 
@@ -56,6 +58,7 @@ idle_threshold_sec  = 600       # terminal considered "not in use" after this mu
 notify_min_level    = "overdue" # minimum urgency that may notify: ok | due | overdue | critical
 notify_cooldown_sec = 1800      # minimum gap between desktop notifications (also fires on escalation)
 units               = "ml"      # "ml" or "oz" — display only
+nuclear_escalation  = false     # at "critical", recolor the ENTIRE tmux status bar (opt-in, intrusive)
 `
 
 // Load reads the config file, falling back to (and writing) defaults when it

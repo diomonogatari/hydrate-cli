@@ -76,7 +76,7 @@ func cmdLog(args []string) int {
 	// Recompute and calm the bar immediately.
 	events, _ := store.LoadEvents()
 	st := hydration.Compute(cfg, events, time.Now())
-	refreshSegment(st)
+	refreshSegment(cfg, st)
 	calmNotifyLevel(st)
 
 	if *asJSON {
@@ -108,7 +108,7 @@ func cmdUndo(args []string) int {
 
 	events, _ := store.LoadEvents()
 	st := hydration.Compute(cfg, events, time.Now())
-	refreshSegment(st)
+	refreshSegment(cfg, st)
 	calmNotifyLevel(st)
 
 	if *asJSON {
@@ -133,7 +133,7 @@ func cmdSegment(args []string) int {
 	if err != nil {
 		return fail(err)
 	}
-	fmt.Println(render.Segment(st.Level, st.GlassesDone, st.GlassesGoal))
+	fmt.Println(render.Segment(st.Level, st.GlassesDone, st.GlassesGoal, false))
 	return 0
 }
 
@@ -152,7 +152,7 @@ func cmdTick(args []string) int {
 	if err != nil {
 		return fail(err)
 	}
-	refreshSegment(st)
+	refreshSegment(cfg, st)
 	decision, sent := maybeNotify(cfg, st)
 
 	if *asJSON {
@@ -260,6 +260,7 @@ func cmdConfig(args []string) int {
 	fmt.Printf("  notify_min_level    = %q\n", cfg.NotifyMinLevel)
 	fmt.Printf("  notify_cooldown_sec = %d\n", cfg.NotifyCooldownSec)
 	fmt.Printf("  units               = %q\n", cfg.Units)
+	fmt.Printf("  nuclear_escalation  = %t\n", cfg.NuclearEscalation)
 	return 0
 }
 
