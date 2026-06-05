@@ -1,169 +1,89 @@
-# hydrate
+# 💧 hydrate
 
-A quiet, terminal-independent hydration nudge for people who live in a terminal
-but rarely *look* at it.
+**A quiet hydration nudge for people who live in the terminal.**
 
-`hydrate` tracks your water intake in a plaintext log and surfaces a single,
-unobtrusive signal in your tmux status bar. When you step away from the keyboard
-and fall behind, it reaches you with one calm desktop notification — and the
-moment you log a drink, the urgency resets.
+[![CI](https://github.com/diomonogatari/hydrate-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/diomonogatari/hydrate-cli/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Go](https://img.shields.io/badge/Go-1.24%2B-00ADD8.svg?logo=go&logoColor=white)](go.mod)
 
-## Design principles
-
-- **Tied to you, not a terminal.** State lives under XDG, derived from an
-  append-only log — logging from any pane updates one shared source of truth and
-  survives closing every terminal.
-- **Don't break focus.** While you're actively typing, the only signal is a
-  quiet tmux segment. Desktop notifications are reserved for when you're away.
-- **Calm instantly on action.** Logging a drink resets urgency immediately.
-- **Plaintext is the artifact.** The log is greppable JSONL; the config is a
-  commented TOML file you can edit by hand.
-- **No nagging.** No streaks, no guilt mechanics; it stays silent while you sleep.
-
-## How it works
+hydrate watches your water intake from your tmux status bar — calm when you're on
+track, impossible to miss when you're behind — and reaches you with a single
+desktop notification *only* when you've stepped away. No popups mid-flow, no
+streaks to maintain, no app to open. Just a glass of water when you need one.
 
 ```text
-  shell hook ──► last_activity ─┐
-                                │   (idle gate: only notify when away)
-  systemd --user timer ──► hydrate tick ──► segment cache ──► tmux status bar
-                                │
-                                └─► org.freedesktop.Notifications (D-Bus)
+ok          💧 5/8                  calm blue · easy to ignore
+due         💧 5/8                  a gentle amber nudge
+overdue     💧 5/8 ·due·            bolder · harder to miss
+critical    💧 DRINK WATER 5/8      bright · bold · blinking · pulsing
 ```
 
-- An append-only **JSONL log** is the single source of truth; all state is
-  derived, never stored as a counter.
-- A **`systemd --user` timer** runs `hydrate tick` ~every 60s: it recomputes
-  urgency, rewrites a pre-rendered **tmux segment cache**, and — only when you've
-  been away from the terminal — sends a desktop notification.
-- The status bar just `cat`s the cache file, so the **hot path never invokes the
-  binary**.
-- Notifications go straight over the **freedesktop D-Bus interface** (no
-  `notify-send` dependency) and work natively on COSMIC, GNOME, KDE, dunst, mako…
-
-## Install
-
-Requires Go 1.24+.
+## Quick start
 
 ```bash
 git clone https://github.com/diomonogatari/hydrate-cli
-cd hydrate-cli
-./install.sh         # builds, installs, then launches `hydrate init`
+cd hydrate-cli && ./install.sh
 ```
 
-`install.sh` builds the binary, installs it to `~/.local/bin`, and hands off to
-the interactive setup. Prefer to drive it yourself?
+That builds the binary and drops you into an interactive setup that tailors your
+goal, wires up your shell and tmux, and starts the background heartbeat. Then:
 
 ```bash
-go install github.com/diomonogatari/hydrate-cli@latest   # binary to $GOBIN
-hydrate init                                             # interactive setup
+hydrate log      # or just `w`  → log a glass; the bar relaxes instantly
+hydrate          # or `ww`      → today at a glance
 ```
 
-### `hydrate init`
+## Why you might like it
 
-A short, `gh`-style wizard that tailors your profile (goal, glass, waking
-window, units, notification floor) and then offers to **enable the background
-heartbeat** (systemd `--user` timer) and **install the zsh hook** — all from the
-binary's embedded assets. It stops short of editing your shell rc or tmux.conf,
-printing those two lines for you to paste. Re-run it any time to reconfigure.
+- **🫧 A glance, not a popup.** One tmux segment that escalates from calm blue to
+  a blinking block as you fall behind — always there, never in your face.
+- **🔕 It respects your focus.** Desktop notifications fire only when you're
+  *away* from the keyboard. While you're typing, it stays silent.
+- **💧 Calm on action.** Log a drink and the urgency resets immediately.
+- **🌙 Smart about your day.** It knows your waking hours and rolls over on your
+  schedule — silent while you sleep, no 3am guilt trips.
+- **📄 Yours in plaintext.** The log is greppable JSONL; the config is
+  hand-editable TOML. No database, no lock-in.
+- **🪶 Featherweight.** A single static Go binary — no runtime, no daemon beyond a
+  60-second user timer, and no `notify-send` dependency.
 
-## Usage
+## Commands
 
-```bash
-hydrate init         # interactive setup (profile + heartbeat + wiring)
-hydrate              # today's intake, time since last drink, next due
-hydrate log          # log one glass (the configured default size)
-hydrate log 500      # log 500 ml
-hydrate log 16oz     # also accepts oz and l (e.g. 1l, 0.5l)
-hydrate undo         # remove the most recent drink logged today
-hydrate stats        # last 7 days: per-day bar, %, average, goal-met count
-hydrate stats --days 14
-hydrate config       # show resolved settings and their file path
-hydrate config --edit  # open the config in $EDITOR
-hydrate tick         # the heartbeat (normally run by the timer; safe by hand)
-hydrate segment      # print the styled tmux string (debugging)
-```
+| Command | What it does |
+| --- | --- |
+| `hydrate init` | Interactive setup (profile, heartbeat, shell/tmux wiring) |
+| `hydrate` | Today's intake, time since last drink, next due |
+| `hydrate log [amount]` | Log a drink — `500`, `500ml`, `16oz`, `1l` (default: one glass) |
+| `hydrate undo` | Remove today's most recent drink |
+| `hydrate stats [--days N]` | History rollup (default: last 7 days) |
+| `hydrate config [--edit]` | Show or edit your settings |
+| `hydrate --help` | Everything else |
 
-Add `--json` to `status`, `log`, `undo`, `tick`, or `stats` for machine-readable
-output. With the shell hook installed, `w` = `hydrate log` and `ww` = `hydrate
-status`.
-
-## tmux status bar
-
-The status bar reads a **pre-rendered cache file** — it never invokes the binary,
-so there's no hot-path cost. Add this to your `tmux.conf`, **after** any
-theme/tpm line (so a theme can't overwrite `status-right`):
-
-```tmux
-set -g status-interval 5
-set -g status-right-length 100   # default is 40, which truncates the segment
-set -ag status-right ' #(cat ${XDG_STATE_HOME:-$HOME/.local/state}/hydrate/segment 2>/dev/null)'
-```
-
-The segment escalates with urgency — subtle blue when `ok`, through amber when
-`overdue`, to a bright, bold, blinking, pulsing block at `critical` (built to
-catch peripheral vision).
-
-## Shell hook (recommended)
-
-Sourcing the hook lets hydrate tell whether the terminal is *in use*, so it never
-notifies while you're typing. It is output-silent (Powerlevel10k instant-prompt
-safe) and fork-free:
-
-```zsh
-source "${XDG_DATA_HOME:-$HOME/.local/share}/hydrate/hydrate.zsh"
-```
+After setup, `w` logs a glass and `ww` shows status. Add `--json` to most
+commands for scripting.
 
 ## Configuration
 
-On first run, `hydrate` writes a commented config to
-`${XDG_CONFIG_HOME:-~/.config}/hydrate/config.toml`:
+The first run writes a commented `~/.config/hydrate/config.toml` — daily goal,
+glass size, waking window, units, and how aggressively to notify. Re-run
+`hydrate init` for the guided version, or `hydrate config --edit` to tweak by
+hand. See [Architecture](docs/ARCHITECTURE.md#configuration) for every knob.
 
-| Key | Default | Meaning |
-| --- | --- | --- |
-| `daily_goal_ml` | `2000` | Target volume per day |
-| `glass_ml` | `250` | Default amount for `hydrate log` |
-| `day_start_hour` / `day_end_hour` | `7` / `23` | Waking window (local); outside it, urgency stays calm |
-| `day_reset_hour` | `4` | When the logical day rolls over (a 1am glass counts to the prior day) |
-| `idle_threshold_sec` | `600` | Shell idle before you count as "away" |
-| `notify_min_level` | `"overdue"` | Lowest urgency that may notify (`due`/`overdue`/`critical`) |
-| `notify_cooldown_sec` | `1800` | Minimum gap between notifications (escalation overrides it) |
-| `units` | `"ml"` | `ml` or `oz`, display only |
+## Requirements
 
-## Urgency levels
+- **Linux**, with tmux for the status segment and — for notifications — any
+  freedesktop-compatible desktop (COSMIC, GNOME, KDE, dunst, mako, …).
+- **Go 1.24+** to build from source, or grab a prebuilt binary from
+  [Releases](../../releases).
+- A `systemd --user` session for the background heartbeat (optional — the bar
+  still updates whenever you log).
 
-`since_last` is measured against an `interval` derived from your goal and waking
-window (`interval = waking_seconds / glasses_needed`):
+## Learn more
 
-| Level | When |
-| --- | --- |
-| `ok` | `since_last < interval`, or outside the waking window |
-| `due` | `interval ≤ since_last < 1.5×` |
-| `overdue` | `1.5× ≤ since_last < 2.5×` |
-| `critical` | `since_last ≥ 2.5×` |
-
-## Data & files
-
-| Path | Purpose |
-| --- | --- |
-| `~/.config/hydrate/config.toml` | User settings |
-| `~/.local/state/hydrate/log.jsonl` | Append-only drink log (`{"ts":…,"ml":…}`) |
-| `~/.local/state/hydrate/segment` | Pre-rendered tmux string (cache) |
-| `~/.local/state/hydrate/last_activity` | Shell-activity timestamp (idle gate) |
-| `~/.local/state/hydrate/notify_state.json` | Last notification (cooldown/escalation) |
-
-Nothing secret is ever stored — only timestamps and millilitres.
-
-## Development
-
-```bash
-make build      # version-stamped binary
-make test       # all unit tests
-make lint       # go vet + gofmt gate
-```
-
-Releases are cut by pushing a `vX.Y.Z` tag: GitHub Actions runs GoReleaser and
-attaches Linux amd64/arm64 archives.
+- 📐 **[Architecture & design](docs/ARCHITECTURE.md)** — how the heartbeat,
+  segment cache, idle gate, and urgency model fit together.
+- 🤝 **[Contributing](CONTRIBUTING.md)** — build, test, and cut a release.
 
 ## License
 
-[MIT](LICENSE).
+[MIT](LICENSE) © diomonogatari

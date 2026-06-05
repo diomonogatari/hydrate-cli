@@ -27,6 +27,8 @@ archives:
     files:
       - README.md
       - LICENSE
+      - CONTRIBUTING.md
+      - src: docs/**/*
       - src: packaging/**/*
 
 checksum:
