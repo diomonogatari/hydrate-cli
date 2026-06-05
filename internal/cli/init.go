@@ -215,8 +215,8 @@ func renderInitSummary(steps []initStep, o summaryOpts) string {
 	}
 
 	b.WriteByte('\n')
-	foot := stDim.Render("New shell loads the ") + stCmd.Render("w") + stDim.Render("/") +
-		stCmd.Render("ww") + stDim.Render(" shortcuts.")
+	foot := stDim.Render("New shell adds shortcuts ") + stCmd.Render("w") + stDim.Render(" (log a glass) and ") +
+		stCmd.Render("ww") + stDim.Render(" (status).")
 	if o.wired {
 		foot += stDim.Render("  ·  backups: *.hydrate.bak")
 	}
